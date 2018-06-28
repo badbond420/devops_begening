@@ -1,0 +1,1 @@
+- in vpc peering add entries in rout-tables for each other's cidr blocks(vpc)

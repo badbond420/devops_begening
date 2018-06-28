@@ -1,0 +1,80 @@
+Installing and Updating Docker:
+    -  v-by default deamon listens to "/var/run/docker.sock" local socket file,( -H option can be used  to make daemon to listen network port )
+	-  docker client talks to the socketfile by default ( if not explicitely configured to listen to any network port, DOCKER_HOST env variable is responsible for this ) )
+	-  Docker Client -- "/var/run/docker.sock" -- docker deamon (by default)
+	-  Actually you can access the container filesystem via /proc/$(docker inspect --format {{.State.Pid}} $YOUR_CONTAINER)/root (when container is running only)
+	-  also possible to access in /var/lib/docker/aufs path, (but which dir not sure )
+	-  yes, kernel version matter. the kernel supports all the namespace isolation and cgroup stuff only are able to manage containers by docker.
+	-  (wes higbee) we can impliment our own container by writing scripts ( fork our service with dedicated  resources with isolated namespaces). 
+	   this is what docker do for us,A userfriendly api to spin container on linus kernel for our service.
+	   
+	   
+Major Docker Components:
+    - 
+
+A Closer Look at Images and Containers:
+    - union file mount  is a layred file system not like differnt-different file system in parallel ( i.e /etc,/var multiple view ), 
+	  but one on top of another and makes it a single layer (overall a single readonly view)
+	- only top layesr is writable which is craeted when a image is instanceated to container.
+	- every change is snapshot as a layer. and stackup in union mount to form an image.
+	- if anything is changed in runtime of container, its is stored only in top layer of the container
+	- docker save and load help import and export docker images as file
+	- docker history img-id shows all the layers , recorded the changes to the images
+	- jenkins image , exec bash works fine with exit, ctl p+q not needed as the PID is jenkins process which is not killed at exit.
+	- not confuse with image and layer. all image are layers but not the vice,layes are the changes recorded but images are taged layers, declared as image.
+	- a dockerfile or commit creates a singe image but that image contains multiple layers.
+	- v. detail of layers, images , containers, volume store/creation (high lavel mechanism) in host file-system in detail using sed in dockerfile by creating multiple images.
+	
+	
+Container Management:
+	- docker pid1 is the command id which we executed in run command, but in normal linux "init" is the pid1.
+	- sigterm kills processid 1, which terminates container as well.
+	- docker kill -s <sinal numer> brhaves per signal number, sends sigkill to pid1.
+	- docker top <container_id>
+	- docker stop is SIGTERM  gracefully  to the pid1 process of that container, but kill is lil more	
+	- containers are running linux process, inside a linux host
+	- docker attach command, attaches to pid1, it lands to shell if pid1 is a shell only. on exit it kills pid1 so the whole container dies.
+	  but if you land in container using exec -it bash, then it will create anothe shell process and land you on it,as this  bash process is not pid1 , so on exit
+	  it wont kill the container.( try with nginx, jenkins etc.)
+	- pid vew from dockerhost is different from view inside container
+	- docker logs command is cool, -f is also there ti give tail -f like feel
+
+
+Building from a Dockerfile:	
+	- every run instruction create a new layer in your image
+	- CMD field from  Dockerfil over-rides base image CMD field.
+	
+Diving Deeper with Dockerfile:
+	- every run command creates  and saves a layer with metadata of FROM  instruction and  a RUN instruction ,
+	  when another build has same matadata it uses this layer instade of creating it again.(only build cash),
+	  (verify with sed,i think on change of Dockerfile invalidate those reuse of cashed layers)
+	- add apt-get clean for  tempfiles removals i.e smaller images.
+	- CMD has 2 type of entry 1: shell form 2: exec form, CMD override by the command at run, 
+	- but in case of ENTRYPOINT it takes the run arguments passed as arguments to ENTRYPOINT command arguments.
+	- if you are using curl or any command in RUN field, that executable must be available insde that container.
+	- CMD supports shell form & exec form, in shell form CMD /bin/bash ,a shell execute the command listed in CMD field .
+	  so "/bin/sh -c /bin/bash" , her pid1 is /bin/sh and it runs command  /bin/bash. but in exec format CMD ["/bin/bash"] , the pid is asigned to /bin/bash directly.
+	  no more  parent shell as pid1
+	- CMD field in Dockerfile replaced if parameter passed in 'docker run' command.
+	- ENTRYPOINT is simlar to CMD but here 'docker run <image> <parameter>' parameter are passed as argument to ENTRYPOINT field but not replaced (not like CMD).
+	  asume ENTRYPOINT as a must execution part during container creation.
+	- both can be used together for higher flexibility.for example read centurilink's CMD vs ENTRYPOINT link
+      ENTRYPOINT ["ping","-c"]
+	  CMD ["localhost"]
+	- but u can replace "localhost" in runtime by passing docker run -d <imgid> } 8.8.8.8
+	- WORKDIR automaticlaly cd (change dir ) to that path, when container is started
+	- ENV fields makes available those parameter values as a environmental variable in side the container
+	- ENV and -e pass Environmental variable can be used in shell script in ENTRYPOINT/CMD field.
+	 (mysql and wp just used those env variable inside the container at entrypoint script to configure app with the script)
+	- ENTRYPOINT and/or  CMD field will be tha same as base image if noe mentioned explicitely in Dockerfile.(try with mix of ENTRYPOINT and CMD in base and new image)
+	
+Docker-compose:
+	- docker-compose scale on web service errors as it has a port-mapping to host, so duplicate portmap errors out.
+	- stack deploy compose file and single host composefile containts are different, cant be used ulternatively
+	- tty :true keeps a container attached to a tty , so that it wont die automaticlly in compose up
+	- docker-compose command creates a sepate bridge network as well as swarm creates a overlay+bridge
+	- docker-compose's bridge networka and swarm's 2 network can recide along side 
+misc:
+- voter-app
+- bastian
+- gitlabstuff

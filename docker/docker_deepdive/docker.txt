@@ -1,0 +1,203 @@
+﻿-Install Docker on any linux flavour: wget -qO- https://get.docker.com | sh
+-add other user to docker group to seamlessly execute docker commands without sudo: sudo usermod -aG docker ubuntu
+-srw-rw---- 1 root docker 0 May 31 06:55 /run/docker.sock : this the socket file for docker deamon
+-docker engine handles namespace(resource isolation), control groups(set limits),union file system to create containers.
+-Api is exposed by enging fo user not much bothering whats happening inside.
+-docker can be a application and also can be used as a vm.
+-control groups, restricts the resource utilisation of containers from host. 
+-image is a buildtime construct and container is a runtime construct (like file and programm)
+-when a image runs, it addad a writable layer on tp of it and called it as running container.
+-image contains os/libs and app files, are layers stacked on top of each other.
+-manifest is the metadata json of image
+-docker.io/nginx is the full name of nginx image from official docker hub
+-image full name:  registry/repo/name i.e  docker.io/radis:lates
+- a repo name can also be like this: bibekmantree/friendlyhello and lates will be image or tag.
+- official images lives in toplavel repo but others live in org or userlevel
+- Dockerfile is always starts with capital D.
+-Instructions in Dockerfile are also capitalize i.e RUN, FROM and so on
+- passing --name="some name"doesnt give ranum name to containers
+- COPY . /lol also works, create a dir named as /lol
+- with dockerhub login if u push ur image, "requested access to the resource is denied"
+- it should be properly named "bibekmantree/mybuild"
+- docker imsge build -t mynsme <git repo path> , This is also possible
+- multistage build is a good thing, see it lil more
+
+: working with container
+- Idea is , dont log in to container and poke around to fix, better start a new container with fixed thnigs
+- docker run
+-docker run -d
+- docker run -it img /bin/bash
+- ctrl p + qO-
+- docker attach containerID
+- docker top container_id
+- docker exec container_id cmd_to_execute
+- docker exec -it container_id /bin/bash to land in the container
+- docker container stop/start/kill/rm containerID
+- exec try to attach to the default service running on container
+: swarm-idt
+- it has 2 things 1. secure cluster and 2 orchestration
+- manager nodes
+-worker nodes
+-  -p 8080:80  here host:container
+-! orcestration is like rolling update, self healing, inter connecting services
+-! docker compose is more of privisioning
+:volumes
+- containers are for ephemeral, non-persistance , stateless stuff.
+- Data are 2 types, persistance and non-persistance.
+- mostly docker is for non-persistance data type, but to create persistance data mount a external volume from aws or san to it.
+- we cal create /delete container without touching volume data. 
+-
+
+?socket and running from a remote??
+?aws docker registry
+?cmd vs entrypoint
+?copy vs add
+?container snapshot
+?container logging
+?wp installation and use of secret
+?provisioning vs orchestration
+?service discovery and load balance in swarm
+?bridge vs overlay
+?why to create a new overlay n/w
+?subnetting/mapping efs to a containerised app(volume chapter)
+?docker on aws as prod/aws way/best practice
+?stack deply a microservice based app, with redis session mgmt
+?session mgmt
+?dns/rout 53
+?ssl offloading
+?web server
+?http request header and all detail
+
+union file system
+docker engine expose an api for users and undernith do operation on kernel and gives us containers.
+containerD handels lificycle of containers.stat,stop,pause works underline layer of docker engine(one more layer undernith Run C, it interact with kernels).
+resetting docker deamon wont harm running containers
+when image is run as container it addas an writebale layer on top of it.one writable layer for each container.
+docker images are like multiple dir in a union file stack, each layer containt can be acceable by that sha named dir, /var/lib/docker.--
+docker config  file is present in  home folder .docker/config.json
+multiple docker registry log entry possible by docker login, and reflect in config.json file.
+but it is a whole lot less than a full blown Ubuntu.
+every container on a host, shares host's kernel
+Docker images (including the ubiquitous ubuntu and debian images) 
+don’t contain kernels, and containers based on them don’t run kernels; they always share the host kernel.
+while image is building, various layr spin a container and add the layer to image and destroy container.
+docker exec is not only for landing into shell but executing other commands as well.
+docker engine/deamon are same
+dockerfile can be refferenced during build by a path or a git url
+--------------------------------------------------------------
+cmd vs entrypoint?
+https://www.ctl.io/developers/blog/post/docker-networking-rules/    ??
+docker app logging??
+-e -v??
+if missed during lunch, can it be added later, -v or somrthing like that.
+socket and running from a remote??
+tag name if private  repo  with url
+
+#############docker networking#################
+- 3 pillars of docker networking
+1.cnm : container network model
+2.Libnetwork
+3.drivers
+- with docker installation, it gets 3 network entries, host, none, and bridge.
+- on creation of a swarm , another bridge entry comes i.e docker_gwbridge
+- Bridge network is scoped only single host. if you spina container in a docker host. it will reside in the bridge network.
+- this is a kind of netwok which inside a host and behaves like anothe network, connected via a router.
+- bridge is like a vswitch
+- containers in 2 different bridge network can not talk "directly" to each other
+- overlay networks:
+- creates 2 bridge on 2 different nodes and create a vxlan tunnel endpoint and and 2 end points are
+ connected over the network where  2 hosts exists, making a virtual single looking nw
+- created 2 overlay n/w in single swarm, by default one container fron oneoverlay nw not able to ping to a containet which in different overlay nw.
+- service is more like multiple cobtainer running with load balanced in a swarm .
+- every container gets a dns resolver (not full blown server), it sends a request to server, running on host , ot to www as a regular process.
+- service discovery is only in network scope (same network).
+- every service do automatin load balancing to its containers attached to it by resolving dns.
+
+########Containerize a software application################
+- while commiting a docker container, a new layer is created by using the writable layr.
+-  update json and history too.
+- if you delete something in container and take a commint, it will increase the new image size rather than decreasing as a new layer is added on to of it.
+- solution to it is to do export and import in docker CLI
+- Example
+REPOSITORY             TAG                 IMAGE ID            CREATED             SIZE
+myimg                  1.0                 8aaabdec5d88        13 minutes ago      140MB <from image ubuntu:latest which has zip file>
+ubuntu                 latest              452a96d81c30        5 weeks ago         79.6MB
+
+~ after deleting zip file
+myimg                  1.1                 b120de2ae991        31 seconds ago      140MB
+
+~see no change is size of image.
+~ lets do export/import in myimg:1.1
+docker container export -o myimg.1.2.tar 922efdaafe5c [zip is deleted in this container]
+~ now import the image out of the tar
+docker image  import myimg.1.2.tar myimg:1.3
+~let see the image size
+myimg                  1.3                 d018dd0981fb        About a minute ago   116MB [decreased]
+myimg                  1.1                 b120de2ae991        About an hour ago    140MB
+myimg                  1.0                 8aaabdec5d88        2 hours ago          140MB 
+~ But the down side is all the details and histry is lost on new image, which we dont want
+
+- base image , on which a autherd image will be build.
+- buld context is the path where Dockerfile plus other associated files exists
+- docker client will initiate the buils, but deamon will do the build, so build context in local laptop. or as a tar file in httphost or a git url.
+- docker build is line craete a container , execute commans, commit it to an intermidiate image and repeat till end of dockerfile.
+- Build cache: when a mulitple instruction in a docker file executes, it creates a intermediate laey for each instruction, which are cached, on next/new build if few instructions are changed
+and few remain changed, the existing intermediate are used again in new build. most of the time few initial steps are reused.
+- ARG is like a variable inside a dockerfile, we have to pass as --build-arg USER=aws 
+- ARG doesnt persists inside container.
+- keeping common instruction initially will help cache re-use, if instructions are not in sorted order , then it wont use cache.
+- USER=aws, also passed in command arument --build-arg USER=aws for various builds. keeping this in beginging
+for multiple image build wont help in cache re-use.
+: Authering a Dockerfile
+- FROM scratch - is used to create a base image.
+- image digest also can be used in FROM, digest is a unique sha string for an image which never change, even tag can be cahnged but not digest.
+- locally created images dont have digest, but it gets one digest after pushing to registry.
+- ENV variable and value to used ans app configuration parameter, it persists in side container as well
+~ ENV can be single line each or multiline
+ex: 
+ENV var1 1
+ENV var2 2
+or
+ENV var1=1\
+	var2=2
+~ here in "=" is the difference.
+ex: Dockerfile
+
+
+FROM ubuntu
+ENV var1 1
+ENV var2=2\
+    var3=3
+
+ARG arg_var1
+ARG arg_var2=6
+ARG arg_var3
+ENV var5=${arg_var1:-5}
+ENV var6=${arg_var3}
+~ {arg_var1:-5} :- is a must 
+-if instructions break, then the build will fail. let say in RUN one of the command breaks.
+- the best practice for RUN ls
+
+ex:
+	RUN command1 args && \
+	    command2 args && \
+		command3 args
+
+- COPY is recomended but not ADD.
+- ADD makes confusion of downloading, unpacking etc, just keep it simple use curl/wget to download and tar commant to unpack etc.
+- copy is more like cp, and uses wildcards. if dest dir path doesnt exists, it creates in image.
+- if WORKDIR is mention in an instruction then container direcly land in that path onle,
+ destination is change if absolute path is not provided as a relative path in workdir and further copy will done in side WORKDIR.
+- as dockerfile create a dir if doesnt exist, then have to little carefull , while copying files and dir
+- ! command instruction accept a shell for or exec form, exec form is prefered
+- in shell type instruction, the main process is a shell and ,the instruction is a childprocess of shell.
+- in case of exec type, the instruction itself executes as process wit pid1, and the signal sent to container hits it but not to any shell.
+__________________________________________________________________________________________________________________________________________________
+__________________________________________________________________________________________________________________________________________________
+# docker swarm with wes higbee
+
+
+
+
+
+ 
